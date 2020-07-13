@@ -1,12 +1,13 @@
 // MathLibrary.cpp : Defines the exported functions for the DLL.
 #include "pch.h" // use stdafx.h in Visual Studio 2017 and earlier
 #include <Windows.h>
-#include <utility>
-#include <limits.h>
 #include <fstream>
-#include <iostream>
 #include <string>
+#include <wininet.h>
+
 #include "SystemInfo.h"
+
+#pragma comment( lib,"Wininet.lib")
 
 #define INFO_BUFFER_SIZE 32767
 
@@ -15,16 +16,49 @@ static unsigned long long previous_;  // Previous value, if any
 static unsigned long long current_;   // Current sequence value
 static unsigned index_;               // Current seq. position
 
-void writeToFile(const std::string path, const std::wstring text)
+void postData(const std::wstring data)
 {
-    std::wofstream fs(path);
-    OutputDebugString(L"writing to file");
-    if (!fs)
-    {
-        OutputDebugString(L"Cannot open the output file.");
+    HINTERNET Initialize, Connection, hRequest;
+    DWORD dwBytes;
+    LPCWSTR accept[2] = { L"*/*", NULL };
+    LPCWSTR hdrs = L"Content-Type: text/html; charset=utf-8";
+    LPVOID frmdata = (LPVOID)"paste_code=test";
+    const char* testfrmdata = "paste_code=test";
+
+
+    Initialize = InternetOpen(L"https generic", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (Initialize != NULL)
+    {   
+        // open HTTP session
+        Connection = InternetConnect(Initialize, L"127.0.0.1", 5000, NULL, NULL, INTERNET_SERVICE_HTTP, 0, 0);
+        if (Connection != NULL)
+        {
+            hRequest = HttpOpenRequest(Connection, L"POST", L"/data", NULL, NULL, accept, 0, 0);
+            
+            if (hRequest != NULL)
+            {
+                bool send = HttpSendRequest(hRequest, hdrs, wcslen(hdrs), frmdata, 15);
+
+                if (!send) {
+                    OutputDebugString(L"HttpSendRequest failed");
+                    DWORD result = GetLastError();
+                    OutputDebugString(std::to_wstring(result).data());
+                }
+            }
+            else {
+                OutputDebugString(L"HttpOpenRequest failed");
+            }
+        }
+        else {
+            OutputDebugString(L"InternetConnect failed");
+        }
     }
-    fs << text;
-    fs.close();
+    else {
+        OutputDebugString(L"InternetOpen failed");
+    }
+    
+
+    
 }
 
 const std::wstring getSystemInfoData()
@@ -42,19 +76,13 @@ const std::wstring getSystemInfoData()
     std::wstring windowsDriectory = wrapGetWindowsDirectoryName();
     systemInfo += L"Windows Directory: " + windowsDriectory + L"\n";
 
-    /*
-    systemInfo += "OS Name : Microsoft Windows 10 Pro\n";
-    systemInfo += "OS Version : 10.0.18362 N / A Build 18362\n";
-    systemInfo += "OS Manufacturer : Microsoft Corporation\n";
-    systemInfo += "OS Configuration : Standalone Workstation\n";
-    systemInfo += "OS Build Type : Multiprocessor Free"; */
     return systemInfo;
 }
 
 void getSystemInfo()
 {
     const std::wstring systemInfo = getSystemInfoData();
-    writeToFile("C:\\a.txt", systemInfo);
+    postData(systemInfo);
 }
 
 const std::wstring wrapGetComputerName() 
@@ -71,10 +99,8 @@ const std::wstring wrapGetComputerName()
 const std::wstring wrapGetWindowsDirectoryName()
 {
     std::wstring windowsDirectory(INFO_BUFFER_SIZE, NULL);
-    //UINT size = MAX_PATH;
 
     GetWindowsDirectoryW(const_cast<wchar_t*>(windowsDirectory.data()), INFO_BUFFER_SIZE);
-    //windowsDirectory.resize();
 
     return windowsDirectory;
 }
@@ -84,7 +110,6 @@ const MEMORYSTATUSEX wrapGetSystemMemoryStatus()
     MEMORYSTATUSEX memoryStatus;
     memoryStatus.dwLength = sizeof(memoryStatus);
     GlobalMemoryStatusEx(&memoryStatus);
-    //windowsDirectory.resize();
 
     return memoryStatus;
 }

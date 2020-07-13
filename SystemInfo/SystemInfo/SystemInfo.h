@@ -1,7 +1,7 @@
 // SYSEMINFO_API.h - Contains declarations of math functions
 #pragma once
 
-extern "C" __declspec (dllimport) void  writeToFile(const std::string path, const std::wstring text);
+extern "C" __declspec (dllimport) void postData(const std::wstring data);
 
 extern "C" __declspec (dllimport) const std::wstring getSystemInfoData();
 
